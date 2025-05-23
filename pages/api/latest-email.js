@@ -1,41 +1,31 @@
+// Example using Mail.tm API
 export default async function handler(req, res) {
-  const address = "redbliss@dcpa.net";
-  const password = "zaQ5@hPcw5";
+  const inbox = process.env.MAIL_TM_EMAIL;
+  const password = process.env.MAIL_TM_PASSWORD;
 
-  // 1. Get access token
-  const loginResp = await fetch("https://api.mail.tm/token", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ address, password }),
-  });
+  // Authenticate
+  const login = await fetch('https://api.mail.tm/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ address: inbox, password }),
+  }).then(r => r.json());
 
-  if (!loginResp.ok) {
-    return res.status(401).json({ error: "Login failed" });
-  }
+  // Fetch messages
+  const messages = await fetch('https://api.mail.tm/messages', {
+    headers: { Authorization: `Bearer ${login.token}` },
+  }).then(r => r.json());
 
-  const { token } = await loginResp.json();
-
-  // 2. Fetch messages
-  const msgListResp = await fetch("https://api.mail.tm/messages", {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-
-  const msgList = await msgListResp.json();
-  const messages = msgList["hydra:member"];
-
-  const targetMsg = messages.find(
-    (m) => m.from.address === "no-reply@skinape.com"
+  // Filter by sender
+  const fromSkinape = messages['hydra:member'].filter(
+    m => m.from && m.from.address === 'no-reply@skinape.com'
   );
 
-  if (!targetMsg) {
-    return res.json({ body: "No email from no-reply@skinape.com yet." });
-  }
+  const latest = fromSkinape[0];
+  if (!latest) return res.status(404).json({ error: "No email found" });
 
-  // 3. Get full message
-  const msgResp = await fetch(`https://api.mail.tm/messages/${targetMsg.id}`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
+  const emailDetail = await fetch(`https://api.mail.tm/messages/${latest.id}`, {
+    headers: { Authorization: `Bearer ${login.token}` },
+  }).then(r => r.json());
 
-  const fullMessage = await msgResp.json();
-  res.json({ body: fullMessage.text || fullMessage.html });
+  res.status(200).json({ subject: emailDetail.subject, body: emailDetail.text });
 }

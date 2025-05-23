@@ -1,22 +1,31 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState } from 'react';
 
 export default function Home() {
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(null);
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      fetch("/api/latest-email")
-        .then(res => res.json())
-        .then(data => setEmail(data.body || "No email yet"));
-    }, 5000);
+    const fetchEmail = async () => {
+      const res = await fetch('/api/latest-email');
+      const data = await res.json();
+      setEmail(data);
+    };
 
+    fetchEmail();
+    const interval = setInterval(fetchEmail, 5000); // refresh every 5s
     return () => clearInterval(interval);
   }, []);
 
   return (
-    <div style={{ padding: 20 }}>
-      <h1>Latest Email from SkinApe</h1>
-      <pre>{email}</pre>
+    <div>
+      <h1>Latest Email</h1>
+      {email ? (
+        <>
+          <h2>{email.subject}</h2>
+          <pre>{email.body}</pre>
+        </>
+      ) : (
+        <p>Loading or no email found...</p>
+      )}
     </div>
   );
 }
